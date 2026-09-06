@@ -15,55 +15,43 @@ async function request(path, options = {}) {
       ...(options.headers || {}),
     },
   });
-
   const text = await response.text();
   let data = null;
   if (text) {
-    try {
-      data = JSON.parse(text);
-    } catch {
-      data = text;
-    }
+    try { data = JSON.parse(text); } catch { data = text; }
   }
-
   if (!response.ok) {
     const message = data?.message || data?.error || text || response.statusText;
     throw new Error(`Supabase REST ${response.status}: ${message}`);
   }
-
   return data;
 }
 
 export async function upsertGuildSettings(settings) {
   const data = await request('guild_settings?on_conflict=guild_id', {
     method: 'POST',
-    headers: {
-      Prefer: 'resolution=merge-duplicates,return=representation',
-    },
+    headers: { Prefer: 'resolution=merge-duplicates,return=representation' },
     body: JSON.stringify(settings),
   });
   return Array.isArray(data) ? data[0] : data;
 }
 
 export async function getGuildSettings(guildId) {
-  const data = await request(`guild_settings?guild_id=eq.${encodeURIComponent(guildId)}&limit=1`, {
-    method: 'GET',
-  });
+  const data = await request(`guild_settings?guild_id=eq.${encodeURIComponent(guildId)}&limit=1`, { method: 'GET' });
   return Array.isArray(data) ? data[0] || null : data || null;
 }
 
 export async function getPendingSession(userId, guildId) {
-  const data = await request(
-    `active_sessions?user_id=eq.${encodeURIComponent(userId)}&guild_id=eq.${encodeURIComponent(guildId)}&status=eq.pending&order=created_at.desc&limit=1`,
-    { method: 'GET' }
-  );
+  const data = await request(`active_sessions?user_id=eq.${encodeURIComponent(userId)}&guild_id=eq.${encodeURIComponent(guildId)}&status=eq.pending&order=created_at.desc&limit=1`, { method: 'GET' });
   return Array.isArray(data) ? data[0] || null : data || null;
 }
 
 export async function getVerifiedSession(userId, guildId) {
-  const data = await request(
-    `active_sessions?user_id=eq.${encodeURIComponent(userId)}&guild_id=eq.${encodeURIComponent(guildId)}&status=eq.verified&order=created_at.desc&limit=1`,
-    { method: 'GET' }
-  );
+  const data = await request(`active_sessions?user_id=eq.${encodeURIComponent(userId)}&guild_id=eq.${encodeURIComponent(guildId)}&status=eq.verified&order=created_at.desc&limit=1`, { method: 'GET' });
+  return Array.isArray(data) ? data[0] || null : data || null;
+}
+
+export async function getLatestVerifiedSession(guildId) {
+  const data = await request(`active_sessions?guild_id=eq.${encodeURIComponent(guildId)}&status=eq.verified&order=created_at.desc&limit=1`, { method: 'GET' });
   return Array.isArray(data) ? data[0] || null : data || null;
 }
