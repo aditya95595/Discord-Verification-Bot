@@ -13,17 +13,18 @@ export const commands = [
       { name: 'channel', description: 'Verification channel', type: 7, required: true },
       { name: 'verified_role', description: 'Role assigned after verification', type: 8, required: true },
       { name: 'quarantine_role', description: 'Role for unverified members', type: 8, required: true },
-      {
-        name: 'security',
-        description: 'Security level',
-        type: 3,
-        required: true,
-        choices: [
-          { name: 'Image Captcha', value: 'image-captcha' },
-          { name: 'hCaptcha', value: 'hcaptcha' },
-          { name: 'Dual-Layer (Recommended)', value: 'dual-layer' },
-        ],
-      },
+      { name: 'security', description: 'Security level', type: 3, required: true, choices: [
+        { name: 'Image Captcha', value: 'image-captcha' },
+        { name: 'hCaptcha', value: 'hcaptcha' },
+        { name: 'Dual-Layer (Recommended)', value: 'dual-layer' },
+      ] },
+    ],
+  },
+  {
+    name: 'autorole',
+    description: 'Set the role automatically assigned to new members',
+    options: [
+      { name: 'role', description: 'Role to assign automatically on join', type: 8, required: true },
     ],
   },
 ];
