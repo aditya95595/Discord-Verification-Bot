@@ -4,7 +4,7 @@ import { REST, Routes } from 'discord.js';
 export const commands = [
   {
     name: 'panel',
-    description: 'Open the Verify Hydra configuration panel',
+    description: 'Open the AGENT 001 configuration panel',
   },
   {
     name: 'setup',
@@ -30,14 +30,14 @@ export const commands = [
 
 export async function registerSlashCommands() {
   const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
-  console.log('[Verify Hydra] Registering slash commands...');
+  console.log('[AGENT 001] Registering slash commands...');
   await rest.put(Routes.applicationCommands(process.env.DISCORD_CLIENT_ID), { body: commands });
-  console.log('[Verify Hydra] Slash commands registered successfully.');
+  console.log('[AGENT 001] Slash commands registered successfully.');
 }
 
 if (process.argv[1] && new URL(import.meta.url).pathname === process.argv[1]) {
   registerSlashCommands().catch((error) => {
-    console.error('[Verify Hydra] Failed to register commands:', error);
+    console.error('[AGENT 001] Failed to register commands:', error);
     process.exitCode = 1;
   });
 }
