@@ -27,6 +27,27 @@ export const commands = [
       { name: 'role', description: 'Role to assign automatically on join', type: 8, required: true },
     ],
   },
+  {
+    name: 'embed',
+    description: 'Send a premium customizable embed to a channel',
+    options: [
+      { name: 'channel', description: 'Channel where the embed will be sent', type: 7, required: true },
+      { name: 'title', description: 'Embed title', type: 3, required: true, max_length: 256 },
+      { name: 'description', description: 'Embed description', type: 3, required: true, max_length: 4000 },
+      { name: 'color', description: 'Hex color, e.g. #5865F2 (default: premium white)', type: 3, required: false },
+    ],
+  },
+  {
+    name: 'embed-edit',
+    description: 'Edit an AGENT 001 embed you previously sent',
+    options: [
+      { name: 'channel', description: 'Channel containing the embed', type: 7, required: true },
+      { name: 'message_id', description: 'Message ID of the embed', type: 3, required: true },
+      { name: 'title', description: 'New title (leave blank to keep current)', type: 3, required: false, max_length: 256 },
+      { name: 'description', description: 'New description (leave blank to keep current)', type: 3, required: false, max_length: 4000 },
+      { name: 'color', description: 'Hex color (leave blank to keep current)', type: 3, required: false },
+    ],
+  },
 ];
 
 export async function registerSlashCommands() {
