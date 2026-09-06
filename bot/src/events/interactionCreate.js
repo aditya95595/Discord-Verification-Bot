@@ -14,681 +14,148 @@ const activePollers = new Map();
 
 export async function handleInteractionCreate(client, interaction) {
   try {
-    if (interaction.isChatInputCommand()) {
-      return handleSlashCommand(client, interaction);
-    }
-
-    if (interaction.isStringSelectMenu()) {
-      return handleSelectMenu(interaction);
-    }
-
-    if (interaction.isButton()) {
-      return handleButton(client, interaction);
-    }
+    if (interaction.isChatInputCommand()) return handleSlashCommand(client, interaction);
+    if (interaction.isStringSelectMenu()) return handleSelectMenu(interaction);
+    if (interaction.isButton()) return handleButton(client, interaction);
   } catch (error) {
-    console.error(`[Verify Hydra] Interaction error:`, error.message);
-
-    const reply = {
-      content: 'An internal error occurred. Please try again.',
-      flags: [MessageFlags.Ephemeral],
-    };
-
-    if (interaction.replied || interaction.deferred) {
-      await interaction.followUp(reply);
-    } else {
-      await interaction.reply(reply);
-    }
+    console.error('[Verify Hydra] Interaction error:', error.message);
+    const reply = { content: 'An internal error occurred. Please try again.', flags: [MessageFlags.Ephemeral] };
+    if (interaction.replied || interaction.deferred) await interaction.followUp(reply);
+    else await interaction.reply(reply);
   }
 }
 
 async function handleSlashCommand(client, interaction) {
   if (interaction.commandName === 'panel') {
-    if (!interaction.memberPermissions.has(PermissionFlagsBits.Administrator)) {
-      return interaction.reply({
-        content: 'Server Administrator required.',
-        flags: [MessageFlags.Ephemeral],
-      });
-    }
-
-    const embed = new EmbedBuilder()
-      .setTitle('VERIFY HYDRA | CONTROL PANEL')
-      .setDescription(
-        'Configure the verification system for this server.\n' +
-        'All settings are restricted to the Server Owner.\n\n' +
-        '-> Step 1: Select the public verification channel\n' +
-        '-> Step 2: Select the role granted upon verification\n' +
-        '-> Step 3: Select the quarantine role for new members\n' +
-        '-> Step 4: Choose the security intensity level\n' +
-        '-> Step 5: Click "Save and Initialize"'
-      )
-      .setColor(0xffffff)
-      .addFields(
-        {
-          name: '\u2588 TARGET CHANNEL',
-          value: 'Select the channel where the verification prompt will be posted.',
-          inline: false,
-        },
-        {
-          name: '\u2588 VERIFIED ROLE',
-          value: 'Select the role assigned to verified members.',
-          inline: false,
-        },
-        {
-          name: '\u2588 QUARANTINE ROLE',
-          value: 'Select the role assigned to new unverified members.',
-          inline: false,
-        },
-        {
-          name: '\u2588 SECURITY LEVEL',
-          value:
-            '`image-captcha` | Image-based challenge\n' +
-            '`hcaptcha` | hCaptcha widget integration\n' +
-            '`dual-layer` | Both captcha layers (Recommended)',
-          inline: false,
-        }
-      )
-      .setFooter({ text: 'Verify Hydra | Automated Security Perimeter' })
-      .setTimestamp();
-
+    if (!interaction.memberPermissions.has(PermissionFlagsBits.Administrator)) return interaction.reply({ content: 'Server Administrator required.', flags: [MessageFlags.Ephemeral] });
+    const embed = new EmbedBuilder().setTitle('VERIFY HYDRA | CONTROL PANEL').setDescription('Configure the verification system for this server.\nAll settings are restricted to the Server Owner.\n\n-> Step 1: Select the public verification channel\n-> Step 2: Select the role granted upon verification\n-> Step 3: Select the quarantine role for new members\n-> Step 4: Choose the security intensity level\n-> Step 5: Click "Save and Initialize"').setColor(0xffffff).addFields(
+      { name: '\u2588 TARGET CHANNEL', value: 'Select the channel where the verification prompt will be posted.', inline: false },
+      { name: '\u2588 VERIFIED ROLE', value: 'Select the role assigned to verified members.', inline: false },
+      { name: '\u2588 QUARANTINE ROLE', value: 'Select the role assigned to new unverified members.', inline: false },
+      { name: '\u2588 SECURITY LEVEL', value: '`image-captcha` | Image-based challenge\n`hcaptcha` | hCaptcha widget integration\n`dual-layer` | Both captcha layers (Recommended)', inline: false }
+    ).setFooter({ text: 'Verify Hydra | Automated Security Perimeter' }).setTimestamp();
     const channels = interaction.guild.channels.cache.filter((ch) => ch.type === 0);
     const roles = interaction.guild.roles.cache.filter((r) => !r.managed && r.id !== interaction.guild.id);
-
     const components = [];
-
     if (channels.size > 0) {
-      const channelSelect = new StringSelectMenuBuilder()
-        .setCustomId('hydra_select_channel')
-        .setPlaceholder('Select verification channel')
-        .addOptions(
-          channels.first(25).map((ch) => ({
-            label: ch.name,
-            value: ch.id,
-            description: `#${ch.name}`,
-          }))
-        );
+      const channelSelect = new StringSelectMenuBuilder().setCustomId('hydra_select_channel').setPlaceholder('Select verification channel').addOptions(channels.first(25).map((ch) => ({ label: ch.name, value: ch.id, description: `#${ch.name}` })));
       components.push(new ActionRowBuilder().addComponents(channelSelect));
     }
-
     if (roles.size > 0) {
-      const verifiedRoleSelect = new StringSelectMenuBuilder()
-        .setCustomId('hydra_select_role')
-        .setPlaceholder('Select verified role')
-        .addOptions(
-          roles.first(25).map((r) => ({
-            label: r.name,
-            value: r.id,
-            description: `Role: ${r.name}`,
-          }))
-        );
+      const verifiedRoleSelect = new StringSelectMenuBuilder().setCustomId('hydra_select_role').setPlaceholder('Select verified role').addOptions(roles.first(25).map((r) => ({ label: r.name, value: r.id, description: `Role: ${r.name}` })));
       components.push(new ActionRowBuilder().addComponents(verifiedRoleSelect));
-
-      const unverifiedRoleSelect = new StringSelectMenuBuilder()
-        .setCustomId('hydra_select_unverified_role')
-        .setPlaceholder('Select quarantine role')
-        .addOptions(
-          roles.first(25).map((r) => ({
-            label: r.name,
-            value: r.id,
-            description: `Role: ${r.name}`,
-          }))
-        );
+      const unverifiedRoleSelect = new StringSelectMenuBuilder().setCustomId('hydra_select_unverified_role').setPlaceholder('Select quarantine role').addOptions(roles.first(25).map((r) => ({ label: r.name, value: r.id, description: `Role: ${r.name}` })));
       components.push(new ActionRowBuilder().addComponents(unverifiedRoleSelect));
     }
-
-    const securitySelect = new StringSelectMenuBuilder()
-      .setCustomId('hydra_select_security')
-      .setPlaceholder('Select security intensity')
-      .addOptions(
-        {
-          label: 'Image Captcha',
-          value: 'image-captcha',
-          description: 'Visual challenge verification',
-        },
-        {
-          label: 'hCaptcha',
-          value: 'hcaptcha',
-          description: 'hCaptcha widget verification',
-        },
-        {
-          label: 'Dual-Layer (Recommended)',
-          value: 'dual-layer',
-          description: 'Maximum security - both captcha types',
-        }
-      );
+    const securitySelect = new StringSelectMenuBuilder().setCustomId('hydra_select_security').setPlaceholder('Select security intensity').addOptions(
+      { label: 'Image Captcha', value: 'image-captcha', description: 'Visual challenge verification' },
+      { label: 'hCaptcha', value: 'hcaptcha', description: 'hCaptcha widget verification' },
+      { label: 'Dual-Layer (Recommended)', value: 'dual-layer', description: 'Maximum security - both captcha types' }
+    );
     components.push(new ActionRowBuilder().addComponents(securitySelect));
-
-    const saveButton = new ButtonBuilder()
-      .setCustomId('hydra_save_config')
-      .setLabel('Save and Initialize')
-      .setStyle(ButtonStyle.Success);
-    components.push(new ActionRowBuilder().addComponents(saveButton));
-
-    await interaction.reply({ embeds: [embed], components, flags: [MessageFlags.Ephemeral] });
+    components.push(new ActionRowBuilder().addComponents(new ButtonBuilder().setCustomId('hydra_save_config').setLabel('Save and Initialize').setStyle(ButtonStyle.Success)));
+    return interaction.reply({ embeds: [embed], components, flags: [MessageFlags.Ephemeral] });
   }
 
   if (interaction.commandName === 'setup') {
-    if (!interaction.memberPermissions.has(PermissionFlagsBits.Administrator)) {
-      return interaction.reply({
-        content: 'Server Administrator required.',
-        flags: [MessageFlags.Ephemeral],
-      });
+    if (!interaction.memberPermissions.has(PermissionFlagsBits.Administrator)) return interaction.reply({ content: 'Server Administrator required.', flags: [MessageFlags.Ephemeral] });
+    await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
+    try {
+      const channel = interaction.options.getChannel('channel');
+      const verifiedRole = interaction.options.getRole('verified_role');
+      const quarantineRole = interaction.options.getRole('quarantine_role');
+      const security = interaction.options.getString('security');
+      if (!channel || channel.type !== 0) return interaction.editReply({ content: 'Channel must be a text channel.' });
+      if (!verifiedRole || verifiedRole.managed || verifiedRole.id === interaction.guild.id) return interaction.editReply({ content: 'Invalid verified role.' });
+      if (!quarantineRole || quarantineRole.managed || quarantineRole.id === interaction.guild.id) return interaction.editReply({ content: 'Invalid quarantine role.' });
+      if (verifiedRole.id === quarantineRole.id) return interaction.editReply({ content: 'Verified role and quarantine role must be different.' });
+      await upsertGuildSettings({ guild_id: interaction.guildId, control_channel_id: interaction.channelId, public_verify_channel_id: channel.id, verified_role_id: verifiedRole.id, unverified_role_id: quarantineRole.id, security_level: security });
+      const verifyEmbed = new EmbedBuilder().setTitle('ACCESS VERIFICATION REQUIRED').setDescription('This server is protected by **Verify Hydra**.\n\n' + `**Server**\n\`\`\`\n${interaction.guild.name}\n\`\`\`\n` + '**How it works**\n' + '1. Click the button below to start\n' + '2. Complete the captcha challenge on the secure page\n' + '3. Return here — your role will be assigned automatically\n\n' + '*Verification expires in 5 minutes.*').setColor(0xffffff).setThumbnail(interaction.guild.iconURL({ size: 128 })).setFooter({ text: `${interaction.guild.name} | Verify Hydra` }).setTimestamp();
+      const verifyButton = new ButtonBuilder().setCustomId('hydra_verify_button').setLabel('Verify My Account').setStyle(ButtonStyle.Primary);
+      await channel.send({ embeds: [verifyEmbed], components: [new ActionRowBuilder().addComponents(verifyButton)] });
+      const successEmbed = new EmbedBuilder().setTitle('CONFIGURATION SAVED').setDescription(`**Channel:** <#${channel.id}>\n**Verified Role:** <@&${verifiedRole.id}>\n**Quarantine Role:** <@&${quarantineRole.id}>\n**Security:** \`${security}\``).setColor(0xffffff).setFooter({ text: 'Verify Hydra | System Initialized' });
+      return interaction.editReply({ embeds: [successEmbed] });
+    } catch (error) {
+      console.error('[Verify Hydra] Setup error:', error.message);
+      return interaction.editReply({ content: 'Failed to complete setup. Check the Wispbyte console for details.' });
     }
-
-    const channel = interaction.options.getChannel('channel');
-    const verifiedRole = interaction.options.getRole('verified_role');
-    const quarantineRole = interaction.options.getRole('quarantine_role');
-    const security = interaction.options.getString('security');
-
-    if (channel.type !== 0) {
-      return interaction.reply({ content: 'Channel must be a text channel.', flags: [MessageFlags.Ephemeral] });
-    }
-
-    if (quarantineRole.managed || quarantineRole.id === interaction.guild.id) {
-      return interaction.reply({ content: 'Invalid quarantine role.', flags: [MessageFlags.Ephemeral] });
-    }
-
-    await upsertGuildSettings({
-      guild_id: interaction.guildId,
-      control_channel_id: interaction.channelId,
-      public_verify_channel_id: channel.id,
-      verified_role_id: verifiedRole.id,
-      unverified_role_id: quarantineRole.id,
-      security_level: security,
-    });
-
-    const verifyEmbed = new EmbedBuilder()
-      .setTitle('ACCESS VERIFICATION REQUIRED')
-      .setDescription(
-        'This server is protected by **Verify Hydra**.\n\n' +
-        `**Server**\n\`\`\`\n${interaction.guild.name}\n\`\`\`\n` +
-        '**How it works**\n' +
-        '1. Click the button below to start\n' +
-        '2. Complete the captcha challenge on the secure page\n' +
-        '3. Return here — your role will be assigned automatically\n\n' +
-        '*Verification expires in 5 minutes.*'
-      )
-      .setColor(0xffffff)
-      .setThumbnail(interaction.guild.iconURL({ size: 128 }))
-      .setFooter({ text: `${interaction.guild.name} | Verify Hydra` })
-      .setTimestamp();
-
-    const verifyButton = new ButtonBuilder()
-      .setCustomId('hydra_verify_button')
-      .setLabel('Verify My Account')
-      .setStyle(ButtonStyle.Primary);
-
-    const verifyRow = new ActionRowBuilder().addComponents(verifyButton);
-
-    await channel.send({ embeds: [verifyEmbed], components: [verifyRow] });
-
-    const successEmbed = new EmbedBuilder()
-      .setTitle('CONFIGURATION SAVED')
-      .setDescription(
-        `**Channel:** <#${channel.id}>\n` +
-        `**Verified Role:** <@&${verifiedRole.id}>\n` +
-        `**Quarantine Role:** <@&${quarantineRole.id}>\n` +
-        `**Security:** \`${security}\``
-      )
-      .setColor(0xffffff)
-      .setFooter({ text: 'Verify Hydra | System Initialized' });
-
-    await interaction.reply({ embeds: [successEmbed], flags: [MessageFlags.Ephemeral] });
   }
 }
 
 async function handleSelectMenu(interaction) {
   const { customId, values, guildId } = interaction;
-
-  if (!interaction.memberPermissions.has(PermissionFlagsBits.Administrator)) {
-    return interaction.reply({
-      content: 'Insufficient permissions. Server Administrator required.',
-      flags: [MessageFlags.Ephemeral],
-    });
-  }
-
-  if (!configStore.has(guildId)) {
-    configStore.set(guildId, {});
-  }
-
+  if (!interaction.memberPermissions.has(PermissionFlagsBits.Administrator)) return interaction.reply({ content: 'Insufficient permissions. Server Administrator required.', flags: [MessageFlags.Ephemeral] });
+  if (!configStore.has(guildId)) configStore.set(guildId, {});
   const config = configStore.get(guildId);
-
-  if (customId === 'hydra_select_channel') {
-    config.channelId = values[0];
-    configStore.set(guildId, config);
-    return interaction.reply({
-      content: `Verification channel set to <#${values[0]}>.`,
-      flags: [MessageFlags.Ephemeral],
-    });
-  }
-
-  if (customId === 'hydra_select_role') {
-    config.roleId = values[0];
-    configStore.set(guildId, config);
-    return interaction.reply({
-      content: `Verified role set to <@&${values[0]}>.`,
-      flags: [MessageFlags.Ephemeral],
-    });
-  }
-
-  if (customId === 'hydra_select_security') {
-    config.securityLevel = values[0];
-    configStore.set(guildId, config);
-    return interaction.reply({
-      content: `Security level set to \`${values[0]}\`.`,
-      flags: [MessageFlags.Ephemeral],
-    });
-  }
-
-  if (customId === 'hydra_select_unverified_role') {
-    config.unverifiedRoleId = values[0];
-    configStore.set(guildId, config);
-    return interaction.reply({
-      content: `Quarantine role set to <@&${values[0]}>.`,
-      flags: [MessageFlags.Ephemeral],
-    });
-  }
+  if (customId === 'hydra_select_channel') { config.channelId = values[0]; configStore.set(guildId, config); return interaction.reply({ content: `Verification channel set to <#${values[0]}>.`, flags: [MessageFlags.Ephemeral] }); }
+  if (customId === 'hydra_select_role') { config.roleId = values[0]; configStore.set(guildId, config); return interaction.reply({ content: `Verified role set to <@&${values[0]}>.`, flags: [MessageFlags.Ephemeral] }); }
+  if (customId === 'hydra_select_security') { config.securityLevel = values[0]; configStore.set(guildId, config); return interaction.reply({ content: `Security level set to \`${values[0]}\`.`, flags: [MessageFlags.Ephemeral] }); }
+  if (customId === 'hydra_select_unverified_role') { config.unverifiedRoleId = values[0]; configStore.set(guildId, config); return interaction.reply({ content: `Quarantine role set to <@&${values[0]}>.`, flags: [MessageFlags.Ephemeral] }); }
 }
 
 async function handleButton(client, interaction) {
-  if (interaction.customId === 'hydra_save_config') {
-    return handleSaveConfig(client, interaction);
-  }
-
-  if (interaction.customId === 'hydra_verify_button') {
-    return handleVerifyButton(client, interaction);
-  }
+  if (interaction.customId === 'hydra_save_config') return handleSaveConfig(client, interaction);
+  if (interaction.customId === 'hydra_verify_button') return handleVerifyButton(client, interaction);
 }
 
 async function handleSaveConfig(client, interaction) {
-  if (!interaction.memberPermissions.has(PermissionFlagsBits.Administrator)) {
-    return interaction.reply({
-      content: 'Insufficient permissions. Server Administrator required.',
-      flags: [MessageFlags.Ephemeral],
-    });
-  }
-
+  if (!interaction.memberPermissions.has(PermissionFlagsBits.Administrator)) return interaction.reply({ content: 'Insufficient permissions. Server Administrator required.', flags: [MessageFlags.Ephemeral] });
   const config = configStore.get(interaction.guildId);
-
-  if (!config || !config.channelId || !config.roleId || !config.unverifiedRoleId || !config.securityLevel) {
-    return interaction.reply({
-      content:
-        'Configuration incomplete. Please select all four options:\n' +
-        '-> Verification Channel\n' +
-        '-> Verified Role\n' +
-        '-> Quarantine Role\n' +
-        '-> Security Level',
-      flags: [MessageFlags.Ephemeral],
-    });
-  }
-
+  if (!config || !config.channelId || !config.roleId || !config.unverifiedRoleId || !config.securityLevel) return interaction.reply({ content: 'Configuration incomplete. Please select all four options:\n-> Verification Channel\n-> Verified Role\n-> Quarantine Role\n-> Security Level', flags: [MessageFlags.Ephemeral] });
   await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
-
   try {
-    const controlChannel = interaction.channel;
-
-    await upsertGuildSettings({
-      guild_id: interaction.guildId,
-      control_channel_id: controlChannel.id,
-      public_verify_channel_id: config.channelId,
-      verified_role_id: config.roleId,
-      unverified_role_id: config.unverifiedRoleId,
-      security_level: config.securityLevel,
-    });
-
+    await upsertGuildSettings({ guild_id: interaction.guildId, control_channel_id: interaction.channelId, public_verify_channel_id: config.channelId, verified_role_id: config.roleId, unverified_role_id: config.unverifiedRoleId, security_level: config.securityLevel });
     const verifyChannel = interaction.guild.channels.cache.get(config.channelId);
-    if (!verifyChannel) {
-      return interaction.editReply({
-        content: 'Error: Target verification channel not found. Reconfigure and try again.',
-      });
-    }
-
-    const verifyEmbed = new EmbedBuilder()
-      .setTitle('ACCESS VERIFICATION REQUIRED')
-      .setDescription(
-        'This server is protected by **Verify Hydra**.\n\n' +
-        `**Server**\n\`\`\`\n${interaction.guild.name}\n\`\`\`\n` +
-        '**How it works**\n' +
-        '1. Click the button below to start\n' +
-        '2. Complete the captcha challenge on the secure page\n' +
-        '3. Return here — your role will be assigned automatically\n\n' +
-        '*Verification expires in 5 minutes.*'
-      )
-      .setColor(0xffffff)
-      .setThumbnail(interaction.guild.iconURL({ size: 128 }))
-      .setFooter({ text: `${interaction.guild.name} | Verify Hydra` })
-      .setTimestamp();
-
-    const verifyButton = new ButtonBuilder()
-      .setCustomId('hydra_verify_button')
-      .setLabel('Verify My Account')
-      .setStyle(ButtonStyle.Primary);
-
-    const verifyRow = new ActionRowBuilder().addComponents(verifyButton);
-
-    await verifyChannel.send({
-      embeds: [verifyEmbed],
-      components: [verifyRow],
-    });
-
+    if (!verifyChannel) return interaction.editReply({ content: 'Error: Target verification channel not found. Reconfigure and try again.' });
+    const verifyEmbed = new EmbedBuilder().setTitle('ACCESS VERIFICATION REQUIRED').setDescription('This server is protected by **Verify Hydra**.\n\n' + `**Server**\n\`\`\`\n${interaction.guild.name}\n\`\`\`\n` + '**How it works**\n' + '1. Click the button below to start\n' + '2. Complete the captcha challenge on the secure page\n' + '3. Return here — your role will be assigned automatically\n\n' + '*Verification expires in 5 minutes.*').setColor(0xffffff).setThumbnail(interaction.guild.iconURL({ size: 128 })).setFooter({ text: `${interaction.guild.name} | Verify Hydra` }).setTimestamp();
+    const verifyButton = new ButtonBuilder().setCustomId('hydra_verify_button').setLabel('Verify My Account').setStyle(ButtonStyle.Primary);
+    await verifyChannel.send({ embeds: [verifyEmbed], components: [new ActionRowBuilder().addComponents(verifyButton)] });
     configStore.delete(interaction.guildId);
-
-    const successEmbed = new EmbedBuilder()
-      .setTitle('CONFIGURATION SAVED')
-      .setDescription(
-        `**Channel:** <#${config.channelId}>\n` +
-        `**Verified Role:** <@&${config.roleId}>\n` +
-        `**Quarantine Role:** <@&${config.unverifiedRoleId}>\n` +
-        `**Security:** \`${config.securityLevel}\``
-      )
-      .setColor(0xffffff)
-      .setFooter({ text: 'Verify Hydra | System Initialized' });
-
+    const successEmbed = new EmbedBuilder().setTitle('CONFIGURATION SAVED').setDescription(`**Channel:** <#${config.channelId}>\n**Verified Role:** <@&${config.roleId}>\n**Quarantine Role:** <@&${config.unverifiedRoleId}>\n**Security:** \`${config.securityLevel}\``).setColor(0xffffff).setFooter({ text: 'Verify Hydra | System Initialized' });
     await interaction.editReply({ embeds: [successEmbed] });
-
     console.log(`[Verify Hydra] Config saved for guild ${interaction.guildId}`);
   } catch (error) {
-    console.error(`[Verify Hydra] Save config error:`, error.message);
-    await interaction.editReply({
-      content: 'Failed to save configuration. Check console for details.',
-    });
+    console.error('[Verify Hydra] Save config error:', error.message);
+    await interaction.editReply({ content: 'Failed to save configuration. Check console for details.' });
   }
 }
-
-// ─── Already Verified Guard ──────────────────────────────────────────────────
 
 async function isAlreadyVerified(client, interaction) {
   const guildSettings = await getGuildSettings(interaction.guildId);
   if (!guildSettings) return false;
-
   const guild = client.guilds.cache.get(interaction.guildId);
   if (!guild) return false;
-
   const member = await guild.members.fetch(interaction.user.id).catch(() => null);
   if (!member) return false;
-
   const verifiedRole = guild.roles.cache.get(guildSettings.verified_role_id);
   if (!verifiedRole) return false;
-
   return member.roles.cache.has(verifiedRole.id);
 }
 
-// ─── Verify Button Handler ───────────────────────────────────────────────────
-
 async function handleVerifyButton(client, interaction) {
   await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
-
   try {
     if (await isAlreadyVerified(client, interaction)) {
-      const alreadyEmbed = new EmbedBuilder()
-        .setTitle('ACCOUNT STATUS')
-        .setDescription('Your account is already verified within this server. Full access is granted.')
-        .setColor(0x1a1a1a)
-        .setFooter({ text: 'Verify Hydra | Access Confirmed' })
-        .setTimestamp();
-
+      const alreadyEmbed = new EmbedBuilder().setTitle('ACCOUNT STATUS').setDescription('Your account is already verified within this server. Full access is granted.').setColor(0x1a1a1a).setFooter({ text: 'Verify Hydra | Access Confirmed' }).setTimestamp();
       return interaction.editReply({ embeds: [alreadyEmbed] });
     }
-
     const guildSettings = await getGuildSettings(interaction.guildId);
     const securityLevel = guildSettings ? guildSettings.security_level : 'dual-layer';
-
-    // Build worker URL with protocol enforcement
-    let workerUrl = (process.env.HYDRA_WORKER_URL || '').trim();
-    if (!workerUrl) {
-      throw new Error('HYDRA_WORKER_URL is not configured');
-    }
-    if (!workerUrl.startsWith('http://') && !workerUrl.startsWith('https://')) {
-      workerUrl = `https://${workerUrl}`;
-    }
-    workerUrl = workerUrl.replace(/\/+$/, '');
-
-    const requestUrl = `${workerUrl}/api/request-verification`;
-
-    const response = await fetch(requestUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.INTERNAL_API_KEY}`,
-      },
-      body: JSON.stringify({
-        user_id: interaction.user.id,
-        guild_id: interaction.guildId,
-        guild_name: interaction.guild.name,
-        security_level: securityLevel,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorBody = await response.text();
-      console.error(`[Verify Hydra] Worker error (${response.status}):`, errorBody);
-      let errorMsg = `Verification request failed (HTTP ${response.status})`;
-      try {
-        const parsed = JSON.parse(errorBody);
-        errorMsg = parsed.message || errorMsg;
-      } catch {}
-      throw new Error(errorMsg);
-    }
-
-    const responseText = await response.text();
-
+    let workerUrl = (process.env.HYDRA_WORKER_URL || '').trim().replace(/\/$/, '');
+    if (!workerUrl) return interaction.editReply({ content: 'Verification service is not configured.' });
+    if (!/^https?:\/\//i.test(workerUrl)) workerUrl = `https://${workerUrl}`;
+    const response = await fetch(`${workerUrl}/api/request-verification`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.INTERNAL_API_KEY}` }, body: JSON.stringify({ user_id: interaction.user.id, guild_id: interaction.guildId, guild_name: interaction.guild.name, security_level: securityLevel }) });
+    const text = await response.text();
     let data;
-    try {
-      data = JSON.parse(responseText);
-    } catch (parseErr) {
-      throw new Error(`Worker returned invalid JSON: ${responseText.substring(0, 100)}`);
-    }
-
-    const verification_url = data.verification_url;
-
-    if (!verification_url || typeof verification_url !== 'string') {
-      throw new Error(`Worker response missing verification_url. Got: ${JSON.stringify(data)}`);
-    }
-
-    if (!verification_url) {
-      throw new Error('Worker returned empty verification URL');
-    }
-
-    // Sanitize and validate the URL
-    let cleanUrl = verification_url.replace(/[\r\n\t]/g, '').trim();
-
-    if (!cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://')) {
-      cleanUrl = `https://${cleanUrl}`;
-    }
-
-    // Validate URL format before passing to Discord.js
-    let parsedUrl;
-    try {
-      parsedUrl = new URL(cleanUrl);
-    } catch (urlErr) {
-      throw new Error(`Malformed verification URL: "${cleanUrl}"`);
-    }
-
-    if (!parsedUrl.protocol.startsWith('http')) {
-      throw new Error(`Invalid protocol in verification URL: ${parsedUrl.protocol}`);
-    }
-
-    const finalUrl = parsedUrl.href;
-
-    const embed = new EmbedBuilder()
-      .setTitle('ACCESS VERIFICATION')
-      .setDescription(
-        'This server requires identity verification to ensure a secure environment.\n\n' +
-        `**Server**\n\`\`\`\n${interaction.guild.name}\n\`\`\`\n` +
-        '**Security Protocol**\n' +
-        'Click the button below to initiate the verification process. ' +
-        'You will be redirected to a secure page where you must complete a captcha challenge.\n\n' +
-        '*This link expires in 5 minutes.*'
-      )
-      .setColor(0xffffff)
-      .setThumbnail(interaction.guild.iconURL({ size: 128 }))
-      .setFooter({ text: 'Verify Hydra | Secure Access Gateway' })
-      .setTimestamp();
-
-    const linkButton = new ButtonBuilder()
-      .setLabel('Start Verification')
-      .setURL(finalUrl)
-      .setStyle(ButtonStyle.Link);
-
-    const linkRow = new ActionRowBuilder().addComponents(linkButton);
-
-    const reply = await interaction.editReply({ embeds: [embed], components: [linkRow] });
-
-    startVerificationPoller(client, interaction.user.id, interaction.guildId, interaction);
+    try { data = JSON.parse(text); } catch { data = null; }
+    if (!response.ok || !data?.verification_url) { console.error('[Verify Hydra] Worker verification request failed:', response.status, text); return interaction.editReply({ content: 'Verification service is temporarily unavailable. Please try again.' }); }
+    const verificationUrl = data.verification_url;
+    if (!/^https?:\/\//i.test(verificationUrl)) return interaction.editReply({ content: 'Verification service returned an invalid verification link.' });
+    const verifyEmbed = new EmbedBuilder().setTitle('VERIFICATION CHALLENGE').setDescription('Complete the secure captcha challenge using the button below.\n\n**Link expires in 5 minutes.**').setColor(0xffffff).setFooter({ text: 'Verify Hydra | Secure Verification' });
+    const verifyButton = new ButtonBuilder().setLabel('Open Verification').setStyle(ButtonStyle.Link).setURL(verificationUrl);
+    return interaction.editReply({ embeds: [verifyEmbed], components: [new ActionRowBuilder().addComponents(verifyButton)] });
   } catch (error) {
-    console.error(`[Verify Hydra] Verify button error:`, error.message);
-    await interaction.editReply({
-      content:
-        'Failed to generate verification link. Please try again later or contact an administrator.',
-    });
-  }
-}
-
-// ─── Pull-Based Verification Poller ──────────────────────────────────────────
-
-function startVerificationPoller(client, userId, guildId, interaction) {
-  const pollerKey = `${userId}:${guildId}`;
-
-  if (activePollers.has(pollerKey)) return;
-
-  const startTime = Date.now();
-  const maxDuration = 5 * 60 * 1000;
-  const pollInterval = 3000;
-
-  const poller = setInterval(async () => {
-    if (Date.now() - startTime > maxDuration) {
-      clearInterval(poller);
-      activePollers.delete(pollerKey);
-      return;
-    }
-
-    try {
-      const session = await getPendingSession(userId, guildId);
-
-      if (!session) {
-        const verifiedSession = await getVerifiedSession(userId, guildId);
-
-        if (verifiedSession) {
-          clearInterval(poller);
-          activePollers.delete(pollerKey);
-
-          await assignVerifiedRole(client, userId, guildId, verifiedSession);
-          await sendVerificationComplete(client, interaction, userId, guildId);
-          return;
-        }
-      }
-
-      if (session && session.status === 'verified') {
-        clearInterval(poller);
-        activePollers.delete(pollerKey);
-
-        await assignVerifiedRole(client, userId, guildId, session);
-        await sendVerificationComplete(client, interaction, userId, guildId);
-        return;
-      }
-    } catch (error) {
-      console.error(`[Verify Hydra] Poller error:`, error.message);
-    }
-  }, pollInterval);
-
-  activePollers.set(pollerKey, poller);
-}
-
-async function sendVerificationComplete(client, interaction, userId, guildId) {
-  try {
-    const guildSettings = await getGuildSettings(guildId);
-    const guild = client.guilds.cache.get(guildId);
-    if (!guild || !guildSettings) return;
-
-    const member = await guild.members.fetch(userId).catch(() => null);
-    const displayName = member ? member.displayName : 'User';
-    const verifiedRole = guild.roles.cache.get(guildSettings.verified_role_id);
-    const roleName = verifiedRole ? verifiedRole.name : 'Verified';
-
-    const successEmbed = new EmbedBuilder()
-      .setTitle('VERIFICATION COMPLETE')
-      .setDescription(
-        `<@${userId}>, your identity has been verified successfully.\n\n` +
-        `**Role Assigned**\n\`\`\`\n${roleName}\n\`\`\`\n` +
-        '**Status**\n' +
-        'You now have full access to this server. Welcome to the community.'
-      )
-      .setColor(0xffffff)
-      .setThumbnail(guild.iconURL({ size: 128 }))
-      .setFooter({ text: `${guild.name} | Verify Hydra` })
-      .setTimestamp();
-
-    const successPayload = { embeds: [successEmbed], components: [] };
-
-    try {
-      await interaction.editReply(successPayload);
-    } catch {
-      try {
-        await interaction.deleteReply();
-      } catch {}
-      await interaction.followUp({ ...successPayload, flags: [MessageFlags.Ephemeral] });
-    }
-  } catch (error) {
-    console.error(`[Verify Hydra] Failed to send verification complete:`, error.message);
-  }
-}
-
-async function assignVerifiedRole(client, userId, guildId, session) {
-  try {
-    const guildSettings = await getGuildSettings(guildId);
-    if (!guildSettings) {
-      console.error(`[Verify Hydra] No guild settings for ${guildId}`);
-      return;
-    }
-
-    const guild = client.guilds.cache.get(guildId);
-    if (!guild) {
-      console.error(`[Verify Hydra] Guild ${guildId} not in cache`);
-      return;
-    }
-
-    const member = await guild.members.fetch(userId).catch(() => null);
-    if (!member) {
-      console.error(`[Verify Hydra] Member ${userId} not found in guild ${guildId}`);
-      return;
-    }
-
-    const verifiedRole = guild.roles.cache.get(guildSettings.verified_role_id);
-    if (!verifiedRole) {
-      console.error(`[Verify Hydra] Verified role ${guildSettings.verified_role_id} not found`);
-      return;
-    }
-
-    const botMember = guild.members.cache.get(client.user.id);
-    if (botMember && botMember.roles.highest.position <= verifiedRole.position) {
-      console.error(`[Verify Hydra] Bot role is below verified role in hierarchy. Move the HydraVerify role above "${verifiedRole.name}" in Server Settings > Roles.`);
-      return;
-    }
-
-    if (!member.roles.cache.has(verifiedRole.id)) {
-      await member.roles.add(verifiedRole, 'Verify Hydra - Account verified');
-    }
-
-    const botHighest = botMember ? botMember.roles.highest.position : 0;
-    const rolesToRemove = member.roles.cache.filter(
-      (role) =>
-        role.id !== guild.id &&
-        role.id !== verifiedRole.id &&
-        !role.managed &&
-        role.position < botHighest
-    );
-
-    if (rolesToRemove.size > 0) {
-      await member.roles.remove(
-        rolesToRemove.map((r) => r.id),
-        'Verify Hydra - Clearing unverified roles'
-      );
-    }
-
-    console.log(`[Verify Hydra] Verified user ${userId} in guild ${guildId} (${guild.name})`);
-  } catch (error) {
-    console.error(`[Verify Hydra] Role assignment error:`, error.message);
-    if (error.message.includes('Missing Permissions')) {
-      console.error(`[Verify Hydra] FIX: Move the HydraVerify bot role above the verified role in Server Settings > Roles`);
-    }
+    console.error('[Verify Hydra] Verification request error:', error.message);
+    return interaction.editReply({ content: 'Unable to start verification. Please try again.' });
   }
 }
