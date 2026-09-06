@@ -49,7 +49,7 @@ export async function handleGuildCreate(client, guild) {
       controlChannel = await guild.channels.create({
         name: 'verify-hydra-control',
         type: ChannelType.GuildText,
-        topic: 'Verify Hydra Configuration Panel | Bot Access Only',
+        topic: 'AGENT 001 Configuration Panel | Bot Access Only',
         permissionOverwrites,
       });
     } catch {
@@ -57,12 +57,12 @@ export async function handleGuildCreate(client, guild) {
     }
 
     if (!controlChannel) {
-      console.error(`[Verify Hydra] No accessible channel in ${guild.name}. Grant Administrator permission and re-invite.`);
+      console.error(`[AGENT 001] No accessible channel in ${guild.name}. Grant Administrator permission and re-invite.`);
       return;
     }
 
     const embed = new EmbedBuilder()
-      .setTitle('VERIFY HYDRA | CONTROL PANEL')
+      .setTitle('AGENT 001 | CONTROL PANEL')
       .setDescription(
         'Configure the verification system for this server.\n' +
         'All settings are restricted to the Server Owner.\n\n' +
@@ -98,7 +98,7 @@ export async function handleGuildCreate(client, guild) {
           inline: false,
         }
       )
-      .setFooter({ text: 'Verify Hydra | Automated Security Perimeter' })
+      .setFooter({ text: 'AGENT 001 | Automated Security Perimeter' })
       .setTimestamp();
 
     const channels = guild.channels.cache.filter((ch) => ch.type === ChannelType.GuildText);
@@ -179,11 +179,11 @@ export async function handleGuildCreate(client, guild) {
         embeds: [embed],
         components,
       });
-      console.log(`[Verify Hydra] Control panel created in ${guild.name} (${guild.id})`);
+      console.log(`[AGENT 001] Control panel created in ${guild.name} (${guild.id})`);
     } catch (sendError) {
-      console.error(`[Verify Hydra] Channel created but panel failed in ${guild.name}:`, sendError.message);
+      console.error(`[AGENT 001] Channel created but panel failed in ${guild.name}:`, sendError.message);
     }
   } catch (error) {
-    console.error(`[Verify Hydra] Failed in ${guild.name}:`, error.message);
+    console.error(`[AGENT 001] Failed in ${guild.name}:`, error.message);
   }
 }
