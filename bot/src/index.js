@@ -4,13 +4,25 @@ import { handleGuildCreate } from './events/guildCreate.js';
 import { handleInteractionCreate } from './events/interactionCreate.js';
 import { handleGuildMemberAdd } from './events/guildMemberAdd.js';
 import { registerSlashCommands } from './deploy-commands.js';
+import { processVerifiedSessions } from './services/verificationProcessor.js';
 
 const client = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMembers,
-  ],
+  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers],
 });
+
+let verificationProcessorRunning = false;
+
+async function runVerificationProcessor() {
+  if (verificationProcessorRunning) return;
+  verificationProcessorRunning = true;
+  try {
+    await processVerifiedSessions(client);
+  } catch (error) {
+    console.error('[AGENT 001] Verification processor error:', error.message);
+  } finally {
+    verificationProcessorRunning = false;
+  }
+}
 
 client.once('clientReady', async () => {
   const count = client.guilds.cache.size;
@@ -23,6 +35,9 @@ client.once('clientReady', async () => {
   } catch (error) {
     console.error('[AGENT 001] Slash command registration failed:', error.message);
   }
+
+  await runVerificationProcessor();
+  setInterval(runVerificationProcessor, 3000).unref?.();
 });
 
 client.on('guildCreate', (guild) => {
