@@ -15,13 +15,13 @@ const client = new Client({
 client.once('clientReady', async () => {
   const count = client.guilds.cache.size;
   client.user.setActivity(`${count} servers`, { type: ActivityType.Playing });
-  console.log(`[Verify Hydra] Bot online: ${client.user.tag}`);
-  console.log(`[Verify Hydra] Serving ${count} guild(s)`);
+  console.log(`[AGENT 001] Bot online: ${client.user.tag}`);
+  console.log(`[AGENT 001] Serving ${count} guild(s)`);
 
   try {
     await registerSlashCommands();
   } catch (error) {
-    console.error('[Verify Hydra] Slash command registration failed:', error.message);
+    console.error('[AGENT 001] Slash command registration failed:', error.message);
   }
 });
 
