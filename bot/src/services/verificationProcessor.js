@@ -1,4 +1,4 @@
-import { getGuildSettings, getVerifiedSession } from '../utils/supabase.js';
+import { getGuildSettings, getLatestVerifiedSession } from '../utils/supabase.js';
 
 const processedTokens = new Set();
 
@@ -8,18 +8,16 @@ export async function processVerifiedSessions(client) {
       const settings = await getGuildSettings(guild.id);
       if (!settings?.verified_role_id) continue;
 
-      const session = await getVerifiedSessionForGuild(guild.id);
+      const session = await getLatestVerifiedSession(guild.id);
       if (!session || processedTokens.has(session.token)) continue;
 
       const member = await guild.members.fetch(session.user_id).catch(() => null);
       if (!member) {
-        console.warn(`[AGENT 001] Verified member ${session.user_id} is no longer in ${guild.name}`);
         processedTokens.add(session.token);
         continue;
       }
 
-      const verifiedRole = guild.roles.cache.get(settings.verified_role_id)
-        || await guild.roles.fetch(settings.verified_role_id).catch(() => null);
+      const verifiedRole = guild.roles.cache.get(settings.verified_role_id) || await guild.roles.fetch(settings.verified_role_id).catch(() => null);
       if (!verifiedRole || verifiedRole.managed || verifiedRole.id === guild.id) {
         console.error(`[AGENT 001] Verified role is missing/invalid in ${guild.name}`);
         continue;
@@ -37,8 +35,7 @@ export async function processVerifiedSessions(client) {
       }
 
       if (settings.unverified_role_id && member.roles.cache.has(settings.unverified_role_id)) {
-        const unverifiedRole = guild.roles.cache.get(settings.unverified_role_id)
-          || await guild.roles.fetch(settings.unverified_role_id).catch(() => null);
+        const unverifiedRole = guild.roles.cache.get(settings.unverified_role_id) || await guild.roles.fetch(settings.unverified_role_id).catch(() => null);
         if (unverifiedRole && !unverifiedRole.managed && unverifiedRole.id !== guild.id && (!botMember || botMember.roles.highest.position > unverifiedRole.position)) {
           await member.roles.remove(unverifiedRole, 'AGENT 001 - Verification completed');
         }
@@ -50,21 +47,4 @@ export async function processVerifiedSessions(client) {
       console.error(`[AGENT 001] Verification role processing error in ${guild.name}:`, error.message);
     }
   }
-}
-
-async function getVerifiedSessionForGuild(guildId) {
-  const session = await getVerifiedSessionByGuild(guildId);
-  return session;
-}
-
-async function getVerifiedSessionByGuild(guildId) {
-  const settings = await getGuildSettings(guildId);
-  if (!settings) return null;
-  const data = await getVerifiedSessionForConfiguredGuild(guildId);
-  return data;
-}
-
-async function getVerifiedSessionForConfiguredGuild(guildId) {
-  const { queryVerifiedSession } = await import('../utils/supabase.js');
-  return queryVerifiedSession(guildId);
 }
