@@ -1,0 +1,8 @@
+name = "verify-hydra-worker"
+main = "index.js"
+compatibility_date = "2026-09-06"
+
+[vars]
+SUPABASE_URL = "https://your-project.supabase.co"
+HCAPTCHA_SITEKEY = "your-hcaptcha-sitekey"
+FRONTEND_BASE_URL = "https://your-worker.workers.dev"
