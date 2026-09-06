@@ -1,11 +1,13 @@
-import { EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder, ButtonStyle, PermissionFlagsBits, MessageFlags } from 'discord.js';
+import { EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder, ButtonStyle, ModalBuilder, TextInputBuilder, TextInputStyle, PermissionFlagsBits, MessageFlags } from 'discord.js';
 import { getGuildSettings, upsertGuildSettings } from '../utils/supabase.js';
 
 const configStore = new Map();
+const embedDrafts = new Map();
 
 export async function handleInteractionCreate(client, interaction) {
   try {
     if (interaction.isChatInputCommand()) return handleSlashCommand(client, interaction);
+    if (interaction.isModalSubmit()) return handleEmbedModal(client, interaction);
     if (interaction.isStringSelectMenu()) return handleSelectMenu(interaction);
     if (interaction.isButton()) return handleButton(client, interaction);
   } catch (error) {
@@ -13,6 +15,39 @@ export async function handleInteractionCreate(client, interaction) {
     const reply = { content: 'An internal error occurred. Please try again.', flags: [MessageFlags.Ephemeral] };
     if (interaction.replied || interaction.deferred) await interaction.followUp(reply); else await interaction.reply(reply);
   }
+}
+
+function canManageEmbeds(interaction) {
+  return interaction.memberPermissions.has(PermissionFlagsBits.Administrator) || interaction.memberPermissions.has(PermissionFlagsBits.ManageMessages);
+}
+
+function validUrl(value) {
+  if (!value) return true;
+  try { const url = new URL(value); return url.protocol === 'http:' || url.protocol === 'https:'; } catch { return false; }
+}
+
+function normalizeColor(value) {
+  if (!value) return 0xffffff;
+  const raw = value.trim().replace(/^#/, '');
+  if (!/^[0-9a-fA-F]{6}$/.test(raw)) return null;
+  return parseInt(raw, 16);
+}
+
+function addOptionalInput(modal, customId, label, value = '', style = TextInputStyle.Short, required = false, placeholder = '') {
+  const input = new TextInputBuilder().setCustomId(customId).setLabel(label).setStyle(style).setRequired(required);
+  if (value) input.setValue(value);
+  if (placeholder) input.setPlaceholder(placeholder);
+  modal.addComponents(new ActionRowBuilder().addComponents(input));
+}
+
+function createEmbedModal(mode, draft = {}) {
+  const modal = new ModalBuilder().setCustomId(mode === 'edit' ? 'agent_embed_edit_modal' : 'agent_embed_create_modal').setTitle(mode === 'edit' ? 'EDIT PREMIUM EMBED' : 'PREMIUM EMBED BUILDER');
+  addOptionalInput(modal, 'media_url', 'Main Image / GIF / Animated Banner URL', draft.media_url || '', TextInputStyle.Short, false, 'https://example.com/banner.gif');
+  addOptionalInput(modal, 'thumbnail_url', 'Thumbnail URL', draft.thumbnail_url || '', TextInputStyle.Short, false, 'Optional small image');
+  addOptionalInput(modal, 'embed_url', 'Embed / Button Link URL', draft.embed_url || '', TextInputStyle.Short, false, 'https://example.com');
+  addOptionalInput(modal, 'footer', 'Footer Text', draft.footer || '', TextInputStyle.Short, false, 'AGENT 001 • Server Name');
+  addOptionalInput(modal, 'footer_icon_url', 'Footer Icon URL', draft.footer_icon_url || '', TextInputStyle.Short, false, 'Defaults to server icon');
+  return modal;
 }
 
 async function handleSlashCommand(client, interaction) {
@@ -33,6 +68,39 @@ async function handleSlashCommand(client, interaction) {
     }
   }
 
+  if (interaction.commandName === 'embed') {
+    if (!canManageEmbeds(interaction)) return interaction.reply({ content: 'Administrator or Manage Messages permission required.', flags: [MessageFlags.Ephemeral] });
+    const channel = interaction.options.getChannel('channel');
+    if (!channel || !channel.isTextBased()) return interaction.reply({ content: 'Select a text channel.', flags: [MessageFlags.Ephemeral] });
+    const color = normalizeColor(interaction.options.getString('color'));
+    if (color === null) return interaction.reply({ content: 'Invalid color. Use a 6-digit hex value such as `#5865F2`.', flags: [MessageFlags.Ephemeral] });
+    const key = `${interaction.guildId}:${interaction.user.id}`;
+    embedDrafts.set(key, { mode: 'create', channelId: channel.id, title: interaction.options.getString('title'), description: interaction.options.getString('description'), color, media_url: interaction.guild.iconURL({ extension: 'png', size: 512 }) || '', thumbnail_url: client.user.displayAvatarURL({ extension: 'png', size: 256 }) || '', embed_url: '', footer: `AGENT 001 • ${interaction.guild.name}`, footer_icon_url: interaction.guild.iconURL({ extension: 'png', size: 128 }) || '' });
+    return interaction.showModal(createEmbedModal('create', embedDrafts.get(key)));
+  }
+
+  if (interaction.commandName === 'embed-edit') {
+    if (!canManageEmbeds(interaction)) return interaction.reply({ content: 'Administrator or Manage Messages permission required.', flags: [MessageFlags.Ephemeral] });
+    const channel = interaction.options.getChannel('channel');
+    if (!channel || !channel.isTextBased()) return interaction.reply({ content: 'Select a text channel.', flags: [MessageFlags.Ephemeral] });
+    await interaction.deferReply({ flags: [MessageFlags.Ephemeral] });
+    try {
+      const message = await channel.messages.fetch(interaction.options.getString('message_id'));
+      const existing = message.embeds[0];
+      if (!existing) return interaction.editReply({ content: 'That message does not contain an embed.' });
+      const colorOption = interaction.options.getString('color');
+      const color = colorOption ? normalizeColor(colorOption) : (existing.color || 0xffffff);
+      if (color === null) return interaction.editReply({ content: 'Invalid color. Use a 6-digit hex value such as `#5865F2`.' });
+      const key = `${interaction.guildId}:${interaction.user.id}`;
+      embedDrafts.set(key, { mode: 'edit', channelId: channel.id, messageId: message.id, title: interaction.options.getString('title') || existing.title || 'AGENT 001', description: interaction.options.getString('description') || existing.description || '', color, media_url: existing.image?.url || '', thumbnail_url: existing.thumbnail?.url || '', embed_url: existing.url || '', footer: existing.footer?.text || `AGENT 001 • ${interaction.guild.name}`, footer_icon_url: existing.footer?.iconURL || interaction.guild.iconURL({ extension: 'png', size: 128 }) || '' });
+      await interaction.editReply({ content: 'Opening the premium embed editor…' });
+      return interaction.followUp({ content: 'Use the editor below to customize media, links and footer.', flags: [MessageFlags.Ephemeral] }).then(() => interaction.showModal(createEmbedModal('edit', embedDrafts.get(key))));
+    } catch (error) {
+      console.error('[AGENT 001] Embed edit preparation error:', error.message);
+      return interaction.editReply({ content: 'Could not fetch that message. Make sure the message ID and channel are correct.' });
+    }
+  }
+
   if (interaction.commandName === 'panel') {
     if (!interaction.memberPermissions.has(PermissionFlagsBits.Administrator)) return interaction.reply({ content: 'Server Administrator required.', flags: [MessageFlags.Ephemeral] });
     const embed = new EmbedBuilder().setTitle('AGENT 001 | CONTROL PANEL').setDescription('Configure the verification system for this server.\n\n-> Step 1: Select the public verification channel\n-> Step 2: Select the role granted upon verification\n-> Step 3: Select the quarantine role for new members\n-> Step 4: Choose the security intensity level\n-> Step 5: Click "Save and Initialize"').setColor(0xffffff).addFields(
@@ -46,8 +114,8 @@ async function handleSlashCommand(client, interaction) {
     const components = [];
     if (channels.size > 0) components.push(new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId('hydra_select_channel').setPlaceholder('Select verification channel').addOptions(channels.first(25).map((ch) => ({ label: ch.name, value: ch.id, description: `#${ch.name}` })))));
     if (roles.size > 0) {
-      components.push(new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId('hydra_select_role').setPlaceholder('Select verified role').addOptions(roles.first(25).map((r) => ({ label: r.name, value: r.id, description: `Role: ${r.name}` })))));
-      components.push(new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId('hydra_select_unverified_role').setPlaceholder('Select quarantine role').addOptions(roles.first(25).map((r) => ({ label: r.name, value: r.id, description: `Role: ${r.name}` })))));
+      components.push(new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId('hydra_select_role').setPlaceholder('Select verified role').addOptions(roles.first(25).map((r) => ({ label: r.name, value: r.id, description: `Role: ${r.name}` }))));
+      components.push(new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId('hydra_select_unverified_role').setPlaceholder('Select quarantine role').addOptions(roles.first(25).map((r) => ({ label: r.name, value: r.id, description: `Role: ${r.name}` }))));
     }
     components.push(new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId('hydra_select_security').setPlaceholder('Select security intensity').addOptions(
       { label: 'Image Captcha', value: 'image-captcha', description: 'Visual challenge verification' },
@@ -81,6 +149,47 @@ async function handleSlashCommand(client, interaction) {
       console.error('[AGENT 001] Setup error:', error.message);
       return interaction.editReply({ content: 'Failed to complete setup. Check the Wispbyte console for details.' });
     }
+  }
+}
+
+async function handleEmbedModal(client, interaction) {
+  if (!interaction.isModalSubmit()) return;
+  if (!canManageEmbeds(interaction)) return interaction.reply({ content: 'Administrator or Manage Messages permission required.', flags: [MessageFlags.Ephemeral] });
+  const key = `${interaction.guildId}:${interaction.user.id}`;
+  const draft = embedDrafts.get(key);
+  if (!draft) return interaction.reply({ content: 'Embed draft expired. Run the command again.', flags: [MessageFlags.Ephemeral] });
+  const mediaUrl = interaction.fields.getTextInputValue('media_url').trim();
+  const thumbnailUrl = interaction.fields.getTextInputValue('thumbnail_url').trim();
+  const embedUrl = interaction.fields.getTextInputValue('embed_url').trim();
+  const footer = interaction.fields.getTextInputValue('footer').trim();
+  const footerIconUrl = interaction.fields.getTextInputValue('footer_icon_url').trim();
+  if (![mediaUrl, thumbnailUrl, embedUrl, footerIconUrl].every(validUrl)) return interaction.reply({ content: 'One or more URLs are invalid. Use full `https://` or `http://` URLs.', flags: [MessageFlags.Ephemeral] });
+  if (draft.mode === 'create' && !draft.channelId) return interaction.reply({ content: 'Target channel is missing.', flags: [MessageFlags.Ephemeral] });
+  try {
+    const embed = new EmbedBuilder().setTitle(draft.title).setDescription(draft.description).setColor(draft.color).setTimestamp();
+    if (embedUrl) embed.setURL(embedUrl);
+    if (mediaUrl) embed.setImage(mediaUrl);
+    if (thumbnailUrl) embed.setThumbnail(thumbnailUrl);
+    if (footer || footerIconUrl) embed.setFooter({ text: footer || `AGENT 001 • ${interaction.guild.name}`, ...(footerIconUrl ? { iconURL: footerIconUrl } : {}) });
+    const payload = { embeds: [embed] };
+    if (embedUrl) payload.components = [new ActionRowBuilder().addComponents(new ButtonBuilder().setLabel('Open Link').setStyle(ButtonStyle.Link).setURL(embedUrl))];
+    if (draft.mode === 'create') {
+      const channel = interaction.guild.channels.cache.get(draft.channelId);
+      if (!channel || !channel.isTextBased()) return interaction.reply({ content: 'Target channel is unavailable.', flags: [MessageFlags.Ephemeral] });
+      const sent = await channel.send(payload);
+      embedDrafts.delete(key);
+      return interaction.reply({ content: `✅ Premium embed sent to <#${channel.id}>. Message ID: \`${sent.id}\``, flags: [MessageFlags.Ephemeral] });
+    }
+    const channel = interaction.guild.channels.cache.get(draft.channelId);
+    if (!channel || !channel.isTextBased()) return interaction.reply({ content: 'Target channel is unavailable.', flags: [MessageFlags.Ephemeral] });
+    const message = await channel.messages.fetch(draft.messageId);
+    if (message.author.id !== client.user.id) return interaction.reply({ content: 'I can only edit embeds sent by AGENT 001.', flags: [MessageFlags.Ephemeral] });
+    await message.edit(payload);
+    embedDrafts.delete(key);
+    return interaction.reply({ content: `✅ Embed updated successfully. [Jump to message](https://discord.com/channels/${interaction.guildId}/${channel.id}/${message.id})`, flags: [MessageFlags.Ephemeral] });
+  } catch (error) {
+    console.error('[AGENT 001] Embed send/edit error:', error.message);
+    return interaction.reply({ content: 'Failed to send or edit the embed. Check that AGENT 001 can view, send messages, embed links and manage the target message.', flags: [MessageFlags.Ephemeral] });
   }
 }
 
