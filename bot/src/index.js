@@ -3,6 +3,7 @@ import { Client, GatewayIntentBits, ActivityType } from 'discord.js';
 import { handleGuildCreate } from './events/guildCreate.js';
 import { handleInteractionCreate } from './events/interactionCreate.js';
 import { handleGuildMemberAdd } from './events/guildMemberAdd.js';
+import { registerSlashCommands } from './deploy-commands.js';
 
 const client = new Client({
   intents: [
@@ -11,11 +12,17 @@ const client = new Client({
   ],
 });
 
-client.once('clientReady', () => {
+client.once('clientReady', async () => {
   const count = client.guilds.cache.size;
   client.user.setActivity(`${count} servers`, { type: ActivityType.Playing });
   console.log(`[Verify Hydra] Bot online: ${client.user.tag}`);
   console.log(`[Verify Hydra] Serving ${count} guild(s)`);
+
+  try {
+    await registerSlashCommands();
+  } catch (error) {
+    console.error('[Verify Hydra] Slash command registration failed:', error.message);
+  }
 });
 
 client.on('guildCreate', (guild) => {
