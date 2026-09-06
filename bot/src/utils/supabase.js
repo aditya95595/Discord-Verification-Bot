@@ -36,11 +36,11 @@ export async function getPendingSession(userId, guildId) {
     .eq('user_id', userId)
     .eq('guild_id', guildId)
     .eq('status', 'pending')
-    .single();
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
-  if (error && error.code !== 'PGRST116') {
-    throw new Error(`Supabase get pending session: ${error.message}`);
-  }
+  if (error) throw new Error(`Supabase get pending session: ${error.message}`);
   return data;
 }
 
@@ -53,10 +53,8 @@ export async function getVerifiedSession(userId, guildId) {
     .eq('status', 'verified')
     .order('created_at', { ascending: false })
     .limit(1)
-    .single();
+    .maybeSingle();
 
-  if (error && error.code !== 'PGRST116') {
-    throw new Error(`Supabase get verified session: ${error.message}`);
-  }
+  if (error) throw new Error(`Supabase get verified session: ${error.message}`);
   return data;
 }
