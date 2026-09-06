@@ -1,5 +1,5 @@
 name = "discord-verification-bot"
-main = "index.js"
+main = "return-to-discord.js"
 compatibility_date = "2026-09-06"
 keep_vars = true
 
