@@ -152,11 +152,10 @@ async function handleSlashCommand(client, interaction) {
 }
 
 async function handleEmbedModal(client, interaction) {
-  if (!interaction.isModalSubmit()) return;
-  if (!canManageEmbeds(interaction)) return interaction.reply({ content: 'Administrator or Manage Messages permission required.', flags: [MessageFlags.Ephemeral] });
   const key = `${interaction.guildId}:${interaction.user.id}`;
   const draft = embedDrafts.get(key);
   if (!draft) return interaction.reply({ content: 'Embed draft expired. Run the command again.', flags: [MessageFlags.Ephemeral] });
+  if (!canManageEmbeds(interaction)) return interaction.reply({ content: 'Administrator or Manage Messages permission required.', flags: [MessageFlags.Ephemeral] });
   const mediaUrl = interaction.fields.getTextInputValue('media_url').trim();
   const thumbnailUrl = interaction.fields.getTextInputValue('thumbnail_url').trim();
   const embedUrl = interaction.fields.getTextInputValue('embed_url').trim();
@@ -168,7 +167,7 @@ async function handleEmbedModal(client, interaction) {
     if (embedUrl) embed.setURL(embedUrl);
     if (mediaUrl) embed.setImage(mediaUrl);
     if (thumbnailUrl) embed.setThumbnail(thumbnailUrl);
-    if (footer || footerIconUrl) embed.setFooter({ text: footer || `AGENT 001 • ${interaction.guild.name}`, ...(footerIconUrl ? { iconURL: footerIconUrl } : {}) });
+    embed.setFooter({ text: footer || `AGENT 001 • ${interaction.guild.name}`, ...(footerIconUrl ? { iconURL: footerIconUrl } : {}) });
     const payload = { embeds: [embed] };
     if (embedUrl) payload.components = [new ActionRowBuilder().addComponents(new ButtonBuilder().setLabel('Open Link').setStyle(ButtonStyle.Link).setURL(embedUrl))];
     if (draft.mode === 'create') {
@@ -181,6 +180,7 @@ async function handleEmbedModal(client, interaction) {
     const channel = interaction.guild.channels.cache.get(draft.channelId);
     if (!channel || !channel.isTextBased()) return interaction.reply({ content: 'Target channel is unavailable.', flags: [MessageFlags.Ephemeral] });
     const message = await channel.messages.fetch(draft.messageId);
+    if (message.author.id !== client.user.id) return interaction.reply({ content: 'I can only edit embeds sent by AGENT 001.', flags: [MessageFlags.Ephemeral] });
     await message.edit(payload);
     embedDrafts.delete(key);
     return interaction.reply({ content: `✅ Embed updated successfully. [Jump to message](https://discord.com/channels/${interaction.guildId}/${channel.id}/${message.id})`, flags: [MessageFlags.Ephemeral] });
