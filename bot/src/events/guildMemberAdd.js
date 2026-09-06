@@ -13,8 +13,8 @@ export async function handleGuildMemberAdd(client, member) {
     const botMember = member.guild.members.cache.get(client.user.id);
     if (botMember && botMember.roles.highest.position <= role.position) return;
 
-    await member.roles.add(role, 'Verify Hydra - New member quarantine');
+    await member.roles.add(role, 'AGENT 001 - New member quarantine');
   } catch (error) {
-    console.error(`[Verify Hydra] Failed to assign unverified role:`, error.message);
+    console.error(`[AGENT 001] Failed to assign unverified role:`, error.message);
   }
 }
