@@ -1,10 +1,7 @@
-name = "verify-hydra-worker"
+name = "discord-verification-bot"
 main = "index.js"
 compatibility_date = "2026-09-06"
 keep_vars = true
 
 # Configure these non-secret variables in Cloudflare Workers > Settings > Variables.
-# Secrets are configured separately in Cloudflare Workers > Settings > Variables and Secrets.
-
-[secrets]
-required = ["INTERNAL_API_KEY", "SUPABASE_SERVICE_ROLE_KEY", "HCAPTCHA_SECRET"]
+# Configure secrets separately in Cloudflare Workers > Settings > Variables and Secrets.
