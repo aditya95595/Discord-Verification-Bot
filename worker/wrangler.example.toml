@@ -1,13 +1,10 @@
 name = "verify-hydra-worker"
 main = "index.js"
-compatibility_date = "2026-06-07"
+compatibility_date = "2026-09-06"
+keep_vars = true
 
-[vars]
-SUPABASE_URL = "https://your-project.supabase.co"
-HCAPTCHA_SITEKEY = "your-hcaptcha-sitekey"
-FRONTEND_BASE_URL = "https://your-worker.workers.dev"
+# Configure these non-secret variables in Cloudflare Workers > Settings > Variables.
+# Secrets are configured separately in Cloudflare Workers > Settings > Variables and Secrets.
 
-# Secrets (set via `wrangler secret put <NAME>`)
-# INTERNAL_API_KEY = "your-internal-api-key"
-# SUPABASE_SERVICE_ROLE_KEY = "your-supabase-service-role-key"
-# HCAPTCHA_SECRET = "your-hcaptcha-secret"
+[secrets]
+required = ["INTERNAL_API_KEY", "SUPABASE_SERVICE_ROLE_KEY", "HCAPTCHA_SECRET"]
